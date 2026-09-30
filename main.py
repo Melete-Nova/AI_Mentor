@@ -1,36 +1,84 @@
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
+from google import genai
+from dotenv import load_dotenv
+from rag import search_knowledge
+from sentiment import analyze_sentiment
+import os
 
+
+# Load environment variables
+load_dotenv()
+
+# Create Gemini client
+client = genai.Client(
+    api_key=os.getenv("GEMINI_API_KEY")
+)
+
+# Create FastAPI app
 app = FastAPI()
 
 
+# Serve frontend files
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
+
+# Open the AI Mentor webpage
+@app.get("/")
+def home():
+    return FileResponse("static/index.html")
+
+
+# Request model
 class ChatRequest(BaseModel):
     message: str
 
 
-@app.get("/")
-def home():
-    return {"message": "Welcome to AI Mentor"}
-
-
+# AI Mentor API
 @app.post("/chat")
 def chat(request: ChatRequest):
 
-    user_message = request.message.lower()
+    # Step 1: Analyze user's sentiment
+    sentiment = analyze_sentiment(request.message)
 
-    if "hello" in user_message or "hi" in user_message:
-        reply = "Hello! I am your AI Mentor. How can I help you?"
+    # Step 2: Search the RAG knowledge base
+    context = search_knowledge(request.message)
 
-    elif "python" in user_message:
-        reply = "Python is a popular programming language used for web development, data science, and AI."
+    # Step 3: Create prompt using sentiment + retrieved knowledge
+    prompt = f"""
+    You are an AI Mentor for a college student.
 
-    elif "machine learning" in user_message:
-        reply = "Machine Learning allows computers to learn patterns from data and make predictions."
+    The student's current sentiment is: {sentiment}
 
-    else:
-        reply = "I am your AI Mentor. Please ask me a question about your studies or career."
+    Adjust your tone based on the sentiment:
+    - If negative, be supportive, encouraging, and patient.
+    - If positive, be encouraging and motivating.
+    - If neutral, be clear, friendly, and informative.
+
+    Use the retrieved knowledge from the student's learning material
+    whenever it is relevant.
+
+    Retrieved knowledge:
+    {context}
+
+    Student's question:
+    {request.message}
+
+    Answer clearly and in a beginner-friendly way.
+    """
+
+    # Step 4: Send to Gemini
+    interaction = client.interactions.create(
+        model="gemini-3.6-flash",
+        input=prompt
+    )
+
+    reply = interaction.output_text
 
     return {
         "user_message": request.message,
+        "sentiment": sentiment,
         "reply": reply
     }

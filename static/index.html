@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>AI Mentor</title>
+
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+
+<body>
+
+    <div class="container">
+
+        <div class="header">
+            <h1>🤖 AI Mentor</h1>
+            <p>Your personal AI learning assistant</p>
+        </div>
+
+        <div id="chatBox" class="chat-box">
+
+            <div class="message bot">
+                <div class="avatar">🤖</div>
+                <div class="bubble">
+                    Hello! 👋 I'm your AI Mentor.<br>
+                    Ask me anything about programming, AI, ML, Data Science or your studies.
+                </div>
+            </div>
+
+        </div>
+
+        <div class="input-area">
+
+            <input
+                type="text"
+                id="messageInput"
+                placeholder="Ask your AI Mentor something..."
+                autocomplete="off"
+            >
+
+            <button onclick="sendMessage()">
+                Send
+            </button>
+
+        </div>
+
+    </div>
+
+   <script>
+
+    async function sendMessage() {
+
+        const input = document.getElementById("messageInput");
+        const chatBox = document.getElementById("chatBox");
+
+        const message = input.value.trim();
+
+        if (message === "") {
+            return;
+        }
+
+        // Display user message
+        chatBox.innerHTML += `
+            <div class="message user">
+                <div class="bubble">
+                    ${message}
+                </div>
+            </div>
+        `;
+
+        input.value = "";
+
+        // Show thinking message
+        chatBox.innerHTML += `
+            <div id="thinking" class="message bot">
+                <div class="avatar">🤖</div>
+                <div class="bubble">
+                    Thinking... 💭
+                </div>
+            </div>
+        `;
+
+        chatBox.scrollTop = chatBox.scrollHeight;
+
+        try {
+
+            console.log("Sending message to backend...");
+
+            const response = await fetch("/chat", {
+
+                method: "POST",
+
+                headers: {
+                    "Content-Type": "application/json"
+                },
+
+                body: JSON.stringify({
+                    message: message
+                })
+
+            });
+
+            console.log("Backend response received:", response.status);
+
+            const data = await response.json();
+
+            console.log("Backend data:", data);
+
+            // Remove thinking message
+            const thinking = document.getElementById("thinking");
+
+            if (thinking) {
+                thinking.remove();
+            }
+
+            // Check if backend returned an error
+            if (!response.ok) {
+                throw new Error(data.detail || "Backend error");
+            }
+
+            // Display AI response
+            chatBox.innerHTML += `
+                <div class="message bot">
+                    <div class="avatar">🤖</div>
+                    <div class="bubble">
+                        ${data.reply}
+                    </div>
+                </div>
+            `;
+
+        } catch (error) {
+
+            console.error("Chatbot error:", error);
+
+            const thinking = document.getElementById("thinking");
+
+            if (thinking) {
+                thinking.remove();
+            }
+
+            chatBox.innerHTML += `
+                <div class="message bot">
+                    <div class="avatar">🤖</div>
+                    <div class="bubble">
+                        Sorry, I couldn't get a response right now. 
+                        Please check the backend terminal.
+                    </div>
+                </div>
+            `;
+
+        }
+
+        chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
+
+    // Press Enter to send
+    document.getElementById("messageInput").addEventListener(
+        "keypress",
+        function(event) {
+
+            if (event.key === "Enter") {
+                sendMessage();
+            }
+
+        }
+    );
+
+</script>
